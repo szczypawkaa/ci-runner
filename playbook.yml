@@ -1,0 +1,85 @@
+---
+- name: Download and install Gitlab Runner
+  hosts: ci_runners
+  tasks:
+    - name: Download the repository configuration script
+      ansible.builtin.get_url:
+        url: "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh"
+        dest: "./script.deb.sh"
+        mode: "0644"
+
+    - name: Inspect the script before running it
+      ansible.builtin.command: less script.deb.sh
+      register: less_output
+      changed_when: false
+
+    - name: Show output
+      ansible.builtin.debug:
+        var: less_output.stdout_lines
+
+    - name: Run the script
+      ansible.builtin.command: bash script.deb.sh
+      changed_when: false
+
+    - name: Install GitLab Runner
+      ansible.builtin.apt:
+        name: gitlab-runner
+        update_cache: true
+
+- name: Install and configure Docker
+  hosts: ci_runners
+  # become: true
+
+  tasks:
+    - name: Install Docker package
+      ansible.builtin.apt:
+        name: docker.io
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure Docker is running and enabled
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Verify Docker installation
+      ansible.builtin.command:
+        argv:
+          - docker
+          - --version
+      register: docker_version
+      changed_when: false
+
+    - name: Display Docker version
+      ansible.builtin.debug:
+        msg: "{{ docker_version.stdout }}"
+
+- name: Register and start Gitlab Runner
+  hosts: ci_runners
+  tasks:
+    - name: Check if GitLab Runner is already configured
+      ansible.builtin.stat:
+        path: /etc/gitlab-runner/config.toml
+      register: runner_config
+
+    - name: Run the register command
+      ansible.builtin.command: >-
+        gitlab-runner register \
+        --non-interactive \
+        --url "https://gitlab-stud.elka.pw.edu.pl" \
+        --token "{{ lookup('ansible.builtin.env', 'RUNNER_TOKEN') }}" \
+        --executor "docker" \
+        --docker-image alpine:latest \
+        --docker-pull-policy "if-not-present" \
+        --description "docker-runner"
+      when: not runner_config.stat.exists
+      changed_when: true
+      no_log: true
+      async: 3600
+      poll: 10
+
+    - name: Start Runner
+      ansible.builtin.command: gitlab-runner start
+      changed_when: true

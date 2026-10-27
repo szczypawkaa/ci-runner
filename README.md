@@ -43,6 +43,30 @@ sudo chmod 700 /root/.ssh
 sudo chmod 600 /root/.ssh/authorized_keys
 ```
 
-
 # Ansible
-## Master Node
+## Installation and configuration
+Install ansible and dependencies on control node
+```
+pipx install --include-deps ansible
+pipx install ansible-lint
+```
+
+Run playbook
+```
+ansible-playbook -i inventory.ini playbook.yml --private-key=~/.ssh/ci-runner
+```
+
+
+Register Runner in Gitlab!
+Export Gitlab Runner token
+```
+export RUNNER_TOKEN=
+```
+
+# TODO
+- check using `changed_when:`
+- change root to user in sudo group
+- configure key variables
+- ansible variables/vault
+- ansible roles
+- add runner to systemd?
